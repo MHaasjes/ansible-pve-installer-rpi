@@ -35,7 +35,7 @@ sudo sudo apt install git -y
 <br><br>Once git is installed, you are ready to clone the script.<br>
 
 ```
-git clone 
+git clone https://github.com/MHaasjes/ansible-pve-installer-rpi.git
 ```
 <br><br>
 Then, enter the directory and change the permission.<br><br>
