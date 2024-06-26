@@ -1,0 +1,82 @@
+---
+- hosts: Proxmox
+  become: true
+  become_user: root
+  vars:
+    newipserver: 192.168.1.x
+    newipgateway: 192.168.1.x
+    newservername: Proxmox
+  
+  tasks:
+  - name: Set a hostname
+    ansible.builtin.hostname:
+      name: "{{ newservername }}"
+
+  - name: SetIP
+    shell: sudo nmcli c mod "Wired connection 1" ipv4.addresses "{{ newipserver }}"/24 ipv4.method manual
+
+  - name: SetIP2
+    shell: sudo nmcli con mod "Wired connection 1" ipv4.gateway "{{ newipgateway }}"
+
+  - name: SetIP3
+    shell: sudo nmcli con mod "Wired connection 1" ipv4.dns 8.8.8.8
+
+  - name: Edittheetchostsfile
+    shell: sudo sed -i "s/raspberrypi/"{{ newservername }}"/g" /etc/hosts
+
+  - name: Edittheetchostsfile
+    shell: sudo sed -i "s/raspberrypi/"{{ newservername }}"/g" /etc/hostname
+
+  - name: Edittheetchostsfile
+    shell: sudo sed -i "s/127.0.1.1/{{ newipserver }}/g" /etc/hosts
+
+  - name: curl pveport.gpg
+    shell: curl -L https://mirrors.apqa.cn/proxmox/debian/pveport.gpg | sudo tee /usr/share/keyrings/pveport.gpg >/dev/null
+
+  - name: echo pveport.list
+    shell: echo "deb [deb=arm64 signed-by=/usr/share/keyrings/pveport.gpg] https://mirrors.apqa.cn/proxmox/debian/pve bookworm port" | sudo tee  /etc/apt/sources.list.d/pveport.list
+
+  - name: apt update
+    shell: apt update
+
+  - name: apt install ifupdown2
+    apt:
+      name:
+      - ifupdown2
+      state: present
+
+  - name: Editing /etc/network/interfaces
+    shell:  sudo sed -i -e '$ a\auto lo\niface lo inet loopback \n \niface eth0 inet manual \n \nauto vmbr0 \niface vmbr0 inet static \n        address newipserver/24 \n        gateway newipgateway \n        bridge-ports eth0 \n        bridge-stp off \n        bridge-fd 0' /etc/network/interfaces
+
+  - name: Editing /etc/network/interfaces2
+    shell:  sudo sed -i "s/newipserver/{{ newipserver }}/g" /etc/network/interfaces
+    
+  - name: Editing /etc/network/interfaces3
+    shell:  sudo sed -i "s/newipgateway/"{{ newipgateway }}"/g" /etc/network/interfaces
+
+  - name: Install Postfix
+    apt:
+      name: postfix
+      state: present
+
+  - name: apt install open-iscsi
+    apt:
+      name:
+      - open-iscsi
+      state: present
+
+  - name: apt install pve-edk2-firmware-aarch64
+    apt:
+      name:
+      - pve-edk2-firmware-aarch64
+      state: present
+
+  - name: apt install proxmox-ve
+    shell: sudo DEBIAN_FRONTEND=noninteractive apt-get install proxmox-ve -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+
+  - name: reboot
+    pause:
+      seconds: 3
+
+  - name: reboot now
+    shell:  sudo reboot
